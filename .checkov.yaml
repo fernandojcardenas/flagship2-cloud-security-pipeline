@@ -1,0 +1,6 @@
+directory:
+  - terraform/baseline
+framework:
+  - terraform
+compact: true
+download-external-modules: false

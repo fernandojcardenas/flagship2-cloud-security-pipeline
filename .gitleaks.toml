@@ -1,0 +1,6 @@
+title = "flagship2-cloud-security-pipeline gitleaks config"
+
+# Start from gitleaks' default ruleset (AWS keys, generic API keys/tokens,
+# private keys, etc.) rather than redefining rules from scratch.
+[extend]
+useDefault = true

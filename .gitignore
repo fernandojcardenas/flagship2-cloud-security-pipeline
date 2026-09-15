@@ -6,3 +6,7 @@
 crash.log
 crash.*.log
 .DS_Store
+
+# Local scratch files created while capturing exploit evidence — never
+# meant to be committed, just proof left on disk during a live run.
+test-public-file.txt

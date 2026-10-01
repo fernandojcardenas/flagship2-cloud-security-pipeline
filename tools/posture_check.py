@@ -24,7 +24,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Seeded misconfigurations not fixed yet. A fix commit removes its number.
-KNOWN_OPEN = {3, 4, 5, 6}
+KNOWN_OPEN = {4, 5, 6}
 
 PREFIX = os.environ.get("PROJECT_NAME", "flagship2-baseline")
 ENDPOINT = os.environ.get("MOTO_ENDPOINT", "http://localhost:5000")
@@ -110,17 +110,21 @@ def vuln2():
 
 
 def vuln3():
+    # Any inbound rule open to the whole internet fails, on any port; SSH
+    # (the seeded case) is named explicitly in the result.
     bad = []
     for sg in ec2.describe_security_groups()["SecurityGroups"]:
         for perm in sg.get("IpPermissions", []):
-            proto = perm.get("IpProtocol")
-            lo, hi = perm.get("FromPort", 0), perm.get("ToPort", 65535)
-            covers_ssh = proto == "-1" or (proto == "tcp" and lo <= 22 <= hi)
             world = [r["CidrIp"] for r in perm.get("IpRanges", []) if r.get("CidrIp") == "0.0.0.0/0"]
             world += [r["CidrIpv6"] for r in perm.get("Ipv6Ranges", []) if r.get("CidrIpv6") == "::/0"]
-            if covers_ssh and world:
-                bad.append(sg["GroupName"])
-    return not bad, ("port 22 open to the internet: " + ", ".join(bad)) if bad else "no SSH from 0.0.0.0/0"
+            if not world:
+                continue
+            proto = perm.get("IpProtocol")
+            lo, hi = perm.get("FromPort", 0), perm.get("ToPort", 65535)
+            ports = "all ports" if proto == "-1" else (f"port {lo}" if lo == hi else f"ports {lo}-{hi}")
+            ssh = " (SSH)" if proto == "-1" or (proto == "tcp" and lo <= 22 <= hi) else ""
+            bad.append(f"{sg['GroupName']}: {ports}{ssh}")
+    return not bad, ("open to the internet: " + "; ".join(bad)) if bad else "no inbound rules open to the internet"
 
 
 def vuln4():

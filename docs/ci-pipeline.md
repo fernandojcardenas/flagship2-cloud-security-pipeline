@@ -68,8 +68,8 @@ no SNS topic for the trail, no instance attached to the security group,
 and CloudWatch Logs for the trail, deferred to Flagship 3 (detection
 engineering), where it's needed.
 
-Current state: Checkov 35 passed, 0 failed, 11 skipped; tfsec 16 passed,
-24 ignored, 0 problems.
+Current state: Checkov 37 passed, 0 failed, 9 skipped; tfsec 15 passed,
+23 ignored, 0 problems.
 
 One limit worth knowing: when a policy refers to another resource (for
 example `aws_s3_bucket.data.arn`), Checkov can't resolve the value before
@@ -93,7 +93,7 @@ than being folded into Stage 1.
 runs `tools/posture_check.py`. The checker reads each seeded control back
 through the AWS API, the way a posture scanner like Prowler would against
 a real account: the bucket's public access block and policy, every
-customer-managed IAM policy, security group rules, bucket encryption, IAM
+customer-managed IAM policy, security group rules (any inbound rule open to the internet), bucket encryption, IAM
 users' access keys and MFA devices, and the trail's settings.
 
 This stage catches what Stage 1 can't see in the source: the IAM user with
@@ -114,13 +114,13 @@ Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
 |---|---|---|---|---|
 | 1 | Public S3 bucket | 2.1.5 | pass | all four settings on; no public bucket policy |
 | 2 | Overly permissive IAM policy | 1.16 | pass | no "*:*" policies |
-| 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | open (seeded) | port 22 open to the internet: flagship2-baseline-wide-open-ssh |
+| 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | pass | no inbound rules open to the internet |
 | 4 | Unencrypted S3 storage | 2.1.1 | open (seeded) | default encryption: none reported (control needs SSE-KMS) |
 | 5 | No MFA / no key rotation on IAM user | 1.10 / 1.14 | open (seeded) | active access key, no MFA: flagship2-baseline-svc-user |
 | 6 | CloudTrail not multi-region, no log validation | 3.1 / 3.2 | open (seeded) | missing: multi-region, log file validation |
 | — | CloudTrail log bucket public access (not seeded) | 2.1.5 | pass | all four settings on |
 
-All results as expected (4 seeded misconfigurations still open).
+All results as expected (3 seeded misconfigurations still open).
 ```
 
 ### What an emulator can and can't prove

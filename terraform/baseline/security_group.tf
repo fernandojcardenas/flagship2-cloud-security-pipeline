@@ -1,33 +1,32 @@
-# VULN #3 — Security group open to the entire internet on SSH. 0.0.0.0/0
-# on port 22 is one of the most-scanned-for misconfigurations that exists;
-# any host in this group is reachable for brute-force/credential-stuffing
-# within minutes of going live. Maps to CIS AWS Foundations 5.2.
+# VULN #3 — Security group open to the entire internet on SSH. FIXED.
 #
-# No EC2 instance is attached to this group in the baseline — the
-# misconfiguration is scannable (both statically and live, once applied)
-# without needing to run, and pay for, an actual instance.
-#tfsec:ignore:aws-ec2-no-public-ingress-sgr
-#tfsec:ignore:aws-ec2-no-public-egress-sgr
-resource "aws_security_group" "wide_open" {
-  #checkov:skip=CKV_AWS_24:VULN #3 seeded (SSH from 0.0.0.0/0), fix pending
-  #checkov:skip=CKV_AWS_382:VULN #3 seeded (allow-all egress), fix pending
-  #checkov:skip=CKV2_AWS_5:By design: no instance is attached, to avoid paying for one
-  name        = "${var.project_name}-wide-open-ssh"
-  description = "VULN: allows inbound SSH from anywhere"
+# As seeded (tag `vulnerable-baseline`), this group allowed SSH (port 22)
+# from 0.0.0.0/0, one of the most-scanned-for misconfigurations there is,
+# plus allow-all egress. See docs/vulnerabilities/03-ssh-open-to-internet.md.
+# Maps to CIS AWS Foundations 5.2.
+#
+# The fix removes inbound access entirely. Admins reach instances through
+# AWS Systems Manager Session Manager, which works over the instance's own
+# outbound HTTPS connection, so no inbound port is needed. Egress is
+# narrowed from "everything" to HTTPS only.
+#
+# No EC2 instance is attached to this group in the baseline, so the
+# configuration can be scanned and checked without paying for one.
 
-  ingress {
-    description = "VULN: SSH open to the entire internet"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+# tfsec flags any egress to 0.0.0.0/0. HTTPS out is needed for Session
+# Manager and package updates, and this lab has no VPC endpoints or NAT to
+# narrow it further. Checkov's allow-all egress check (CKV_AWS_382) passes.
+#tfsec:ignore:aws-ec2-no-public-egress-sgr
+resource "aws_security_group" "app" {
+  #checkov:skip=CKV2_AWS_5:By design: no instance is attached, to avoid paying for one
+  name        = "${var.project_name}-app"
+  description = "App instances: no inbound access; outbound HTTPS only"
 
   egress {
-    description = "Default allow-all egress"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "HTTPS out (Session Manager, package updates)"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }

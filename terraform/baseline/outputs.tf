@@ -13,9 +13,9 @@ output "svc_user_name" {
   value       = aws_iam_user.svc.name
 }
 
-output "wide_open_security_group_id" {
-  description = "Security group open to 0.0.0.0/0 on SSH (VULN #3)."
-  value       = aws_security_group.wide_open.id
+output "app_security_group_id" {
+  description = "Security group for app instances (VULN #3, fixed: no inbound access)."
+  value       = aws_security_group.app.id
 }
 
 # Deliberately not outputting aws_iam_access_key.svc.id/.secret — no reason

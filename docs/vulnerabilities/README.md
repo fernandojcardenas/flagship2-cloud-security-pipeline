@@ -11,7 +11,7 @@ real AWS before that decision.
 |---|---|---|---|
 | 1 | Public S3 bucket | 2.1.5 | Fixed. Exploited on real AWS (Sept 2026); fix confirmed by scanners and the emulator posture check ([writeup](01-public-s3-bucket.md)) |
 | 2 | Overly permissive IAM policy | 1.16 | Fixed (least privilege); scanners, Cloudsplaining and the emulator posture check confirm ([writeup](02-overly-permissive-iam-policy.md)) |
-| 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | Not started |
+| 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | Fixed (no inbound access, HTTPS-only egress); scanners and the emulator posture check confirm ([writeup](03-ssh-open-to-internet.md)) |
 | 4 | Unencrypted S3 storage | 2.1.1 | Not started |
 | 5 | No MFA / no key rotation on IAM user | 1.10 / 1.12 / 1.14 | Not started |
 | 6 | CloudTrail not multi-region, no log file validation | 3.1 / 3.2 | Not started |

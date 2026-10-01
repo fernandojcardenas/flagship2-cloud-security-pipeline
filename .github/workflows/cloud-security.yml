@@ -4,13 +4,31 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   iac-static-scan:
     name: "Stage 1: Static IaC scan (Checkov + tfsec)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.9.8
+
+      - name: terraform fmt and validate
+        working-directory: terraform/baseline
+        run: |
+          terraform fmt -check -diff -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
+      # Fails the build on any finding that isn't suppressed. Seeded
+      # misconfigurations that aren't fixed yet are suppressed inline on
+      # their own resource ("VULN #n seeded ... fix pending"); the fix
+      # commit deletes the suppression, so from then on CI guards the fix.
       - name: Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
@@ -23,17 +41,18 @@ jobs:
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           working_directory: terraform/baseline
+          version: v1.28.14
 
   secret-scan:
     name: "Stage 2: Secret scan (gitleaks)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -48,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     if: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

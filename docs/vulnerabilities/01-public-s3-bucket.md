@@ -2,10 +2,13 @@
 
 **CIS AWS Foundations Benchmark control:** 2.1.5
 
-**Status:** Exploited against real AWS. Fix not yet applied — see "Fix" below.
+**Status:** Exploited against real AWS (2026-09-15). Fixed in code and
+confirmed by both static scanners (2026-10-01). Live re-check against AWS
+still pending — see "Live re-verification" below.
 
 ## Where it's seeded
 
+The vulnerable version is preserved at the `vulnerable-baseline` tag. There,
 `terraform/baseline/s3.tf` provisions the `data` bucket with two deliberate
 misconfigurations:
 
@@ -82,13 +85,117 @@ $ terraform destroy
 Destroy complete! Resources: 13 destroyed.
 ```
 
-## Fix (not yet applied)
+## Fix
 
-Planned for a follow-up run:
+In `terraform/baseline/s3.tf`:
 
-- Set all four `aws_s3_bucket_public_access_block.data` flags to `true`
-- Remove `aws_s3_bucket_policy.data_public_read` entirely
-- Re-apply, re-run the same `curl` request, and confirm it now fails
-  (expected: `AccessDenied` / blocked, instead of the object body coming
-  back)
-- Capture that after-state as the "fixed" evidence, then destroy again
+- All four `aws_s3_bucket_public_access_block.data` flags set to `true`.
+- `aws_s3_bucket_policy.data_public_read` removed entirely. Nothing in this
+  project needs anonymous reads, so the fix is no public policy at all, not
+  a narrower one.
+
+The output `public_bucket_name` was renamed `data_bucket_name`, since the
+bucket is no longer public. The provisioning output above is the original
+run and keeps the old name.
+
+### Static scan, before and after
+
+Run locally with Checkov 3.3.22 and tfsec v1.28.14, limited to the S3
+public-access checks. Checkov's banner, blank lines and "Guide:" URL lines
+are trimmed; nothing else is.
+
+Before (`vulnerable-baseline`):
+
+```
+$ checkov -d terraform/baseline --framework terraform --compact -c CKV_AWS_53,CKV_AWS_54,CKV_AWS_55,CKV_AWS_56,CKV_AWS_70,CKV2_AWS_6
+terraform scan results:
+Passed checks: 0, Failed checks: 7, Skipped checks: 0
+Check: CKV_AWS_53: "Ensure S3 bucket has block public ACLS enabled"
+	FAILED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV_AWS_54: "Ensure S3 bucket has block public policy enabled"
+	FAILED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV_AWS_56: "Ensure S3 bucket has 'restrict_public_buckets' enabled"
+	FAILED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV_AWS_55: "Ensure S3 bucket has ignore public ACLs enabled"
+	FAILED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV_AWS_70: "Ensure S3 bucket does not allow an action with any Principal"
+	FAILED for resource: aws_s3_bucket_policy.data_public_read
+	File: /s3.tf:29-46
+Check: CKV2_AWS_6: "Ensure that S3 bucket has a Public Access block"
+	FAILED for resource: aws_s3_bucket.data
+	File: /s3.tf:15-18
+Check: CKV2_AWS_6: "Ensure that S3 bucket has a Public Access block"
+	FAILED for resource: aws_s3_bucket.cloudtrail
+	File: /cloudtrail.tf:7-10
+```
+
+The last finding is the CloudTrail log bucket, which had no public access
+block at all. It isn't one of the six seeded misconfigurations, but a
+trail's logs should never be public, so the same commit gives that bucket a
+full public access block too.
+
+tfsec on the same code reports `aws-s3-block-public-acls`,
+`aws-s3-block-public-policy`, `aws-s3-ignore-public-acls` and
+`aws-s3-no-public-buckets`, all HIGH, on
+`aws_s3_bucket_public_access_block.data` (lines 23–26, one per `false` flag).
+
+After (the fix):
+
+```
+$ checkov -d terraform/baseline --framework terraform --compact -c CKV_AWS_53,CKV_AWS_54,CKV_AWS_55,CKV_AWS_56,CKV_AWS_70,CKV2_AWS_6
+terraform scan results:
+Passed checks: 10, Failed checks: 0, Skipped checks: 0
+Check: CKV_AWS_53: "Ensure S3 bucket has block public ACLS enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.cloudtrail
+	File: /cloudtrail.tf:19-26
+Check: CKV_AWS_54: "Ensure S3 bucket has block public policy enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.cloudtrail
+	File: /cloudtrail.tf:19-26
+Check: CKV_AWS_56: "Ensure S3 bucket has 'restrict_public_buckets' enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.cloudtrail
+	File: /cloudtrail.tf:19-26
+Check: CKV_AWS_55: "Ensure S3 bucket has ignore public ACLs enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.cloudtrail
+	File: /cloudtrail.tf:19-26
+Check: CKV_AWS_53: "Ensure S3 bucket has block public ACLS enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV_AWS_54: "Ensure S3 bucket has block public policy enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV_AWS_56: "Ensure S3 bucket has 'restrict_public_buckets' enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV_AWS_55: "Ensure S3 bucket has ignore public ACLs enabled"
+	PASSED for resource: aws_s3_bucket_public_access_block.data
+	File: /s3.tf:20-27
+Check: CKV2_AWS_6: "Ensure that S3 bucket has a Public Access block"
+	PASSED for resource: aws_s3_bucket.cloudtrail
+	File: /cloudtrail.tf:9-13
+Check: CKV2_AWS_6: "Ensure that S3 bucket has a Public Access block"
+	PASSED for resource: aws_s3_bucket.data
+	File: /s3.tf:14-18
+```
+
+`CKV_AWS_70` no longer appears because the public policy it flagged no
+longer exists. tfsec reports the same four checks as passed for both
+buckets.
+
+CI now enforces this: these checks fail the build if the public access block
+is weakened again. To confirm, the old `s3.tf` was put back temporarily and
+both scanners failed (Checkov exit 1 with 6 findings, tfsec exit 1 with 4
+HIGH).
+
+## Live re-verification (pending)
+
+Static scans prove what the Terraform says, not what AWS does. Still to do,
+in a short-lived apply:
+
+- Apply the fixed baseline, upload a test object as the bucket owner.
+- Re-run the same unauthenticated `curl`; expected: `AccessDenied` instead
+  of the object body.
+- Capture that output here as the after-state, then `terraform destroy`.

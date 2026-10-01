@@ -4,3 +4,19 @@ framework:
   - terraform
 compact: true
 download-external-modules: false
+
+# Controls accepted for this project as a whole, not tied to one of the six
+# seeded misconfigurations. The lab's buckets are short-lived (applied only
+# to capture evidence, then destroyed), so these add cost or moving parts
+# without changing what the project demonstrates. A production account
+# would need them. Rationale per control: docs/ci-pipeline.md.
+#
+# Everything else is suppressed inline, on the one resource it applies to,
+# with a reason. Seeded misconfigurations carry "VULN #n seeded ... fix
+# pending" and the suppression is deleted in the same commit as the fix.
+skip-check:
+  - CKV_AWS_18   # S3 server access logging
+  - CKV_AWS_21   # S3 versioning
+  - CKV_AWS_144  # S3 cross-region replication
+  - CKV2_AWS_61  # S3 lifecycle configuration
+  - CKV2_AWS_62  # S3 event notifications

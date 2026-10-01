@@ -20,7 +20,17 @@ resource "aws_iam_role" "app" {
   })
 }
 
+#tfsec:ignore:aws-iam-no-policy-wildcards
 resource "aws_iam_policy" "app_admin" {
+  #checkov:skip=CKV_AWS_62:VULN #2 seeded (full "*:*" admin), fix pending
+  #checkov:skip=CKV_AWS_63:VULN #2 seeded ("*" action), fix pending
+  #checkov:skip=CKV_AWS_355:VULN #2 seeded ("*" resource), fix pending
+  #checkov:skip=CKV_AWS_286:VULN #2 seeded (privilege escalation), fix pending
+  #checkov:skip=CKV_AWS_287:VULN #2 seeded (credentials exposure), fix pending
+  #checkov:skip=CKV_AWS_288:VULN #2 seeded (data exfiltration), fix pending
+  #checkov:skip=CKV_AWS_289:VULN #2 seeded (permissions management), fix pending
+  #checkov:skip=CKV_AWS_290:VULN #2 seeded (unconstrained write), fix pending
+  #checkov:skip=CKV2_AWS_40:VULN #2 seeded (full IAM privileges), fix pending
   name        = "${var.project_name}-overpermissive-policy"
   description = "VULN: grants unrestricted access to every action on every resource."
 
@@ -51,6 +61,7 @@ resource "aws_iam_role_policy_attachment" "app_admin" {
 # catch Flagship 1's IDOR and plaintext-password bugs. Maps to CIS AWS
 # Foundations 1.10 / 1.12 / 1.14.
 resource "aws_iam_user" "svc" {
+  #checkov:skip=CKV_AWS_273:VULN #5 seeded (long-lived IAM user instead of SSO), fix pending
   name = "${var.project_name}-svc-user"
 }
 

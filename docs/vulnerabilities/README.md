@@ -8,7 +8,7 @@ attacker "could" do.
 
 | # | Misconfiguration | CIS AWS control | Status |
 |---|---|---|---|
-| 1 | Public S3 bucket | 2.1.5 | Exploited — fix pending ([writeup](01-public-s3-bucket.md)) |
+| 1 | Public S3 bucket | 2.1.5 | Exploited; fixed in code, scanners confirm; live re-check pending ([writeup](01-public-s3-bucket.md)) |
 | 2 | Overly permissive IAM policy | 1.16 | Not started |
 | 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | Not started |
 | 4 | Unencrypted S3 storage | 2.1.1 | Not started |

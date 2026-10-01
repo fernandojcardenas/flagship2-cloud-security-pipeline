@@ -1,5 +1,5 @@
-output "public_bucket_name" {
-  description = "Name of the deliberately public S3 bucket (VULN #1 / #4)."
+output "data_bucket_name" {
+  description = "Name of the data bucket (VULN #1, fixed; VULN #4)."
   value       = aws_s3_bucket.data.bucket
 }
 

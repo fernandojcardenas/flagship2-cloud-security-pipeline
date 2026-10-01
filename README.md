@@ -1,8 +1,13 @@
 # Flagship 2: Cloud Security Pipeline
 
-Status: **scaffolded, not yet built out.** This README will grow the same
-way Flagship 1's did — methodology and findings sections get added once
-there's something real to report, not written in advance of it.
+Status: **in progress — 1 of 6 misconfigurations fixed** (see
+[docs/vulnerabilities/](docs/vulnerabilities/README.md)). The static scans
+and the secret scan run in CI and pass. This README will grow the same way
+Flagship 1's did — methodology and findings sections get added once there's
+something real to report, not written in advance of it.
+
+The original, fully vulnerable baseline is kept at the
+[`vulnerable-baseline`](../../tree/vulnerable-baseline) tag.
 
 A Terraform baseline for a small AWS footprint (S3, IAM, a security group,
 CloudTrail), seeded with six deliberate misconfigurations, each mapped to

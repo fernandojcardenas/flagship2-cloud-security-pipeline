@@ -1,18 +1,18 @@
 # VULN #1 — Public S3 bucket (A01-style broken access control for cloud).
-# All four public-access protections are explicitly disabled, and a bucket
-# policy grants anonymous s3:GetObject to everyone. This is the single most
-# common real-world cloud breach pattern. Maps to CIS AWS Foundations 2.1.5
+# FIXED. As seeded (tag `vulnerable-baseline`), all four public-access
+# protections were disabled and a bucket policy granted anonymous
+# s3:GetObject to everyone; see docs/vulnerabilities/01-public-s3-bucket.md
+# for the real exploit. The fix turns all four protections on and removes
+# the public-read policy entirely. Maps to CIS AWS Foundations 2.1.5
 # (S3 Block Public Access).
-#
-# SAFETY: this bucket is intentionally public once applied. Never put real
-# or sensitive data in it — only throwaway test objects for the exploit
-# writeup, and only for as long as it takes to capture evidence before
-# `terraform destroy`.
 resource "random_id" "suffix" {
   byte_length = 4
 }
 
+#tfsec:ignore:aws-s3-enable-bucket-encryption
+#tfsec:ignore:aws-s3-encryption-customer-key
 resource "aws_s3_bucket" "data" {
+  #checkov:skip=CKV_AWS_145:VULN #4 seeded (no customer-managed KMS key), fix pending
   bucket        = "${var.project_name}-data-${random_id.suffix.hex}"
   force_destroy = true
 }
@@ -20,30 +20,15 @@ resource "aws_s3_bucket" "data" {
 resource "aws_s3_bucket_public_access_block" "data" {
   bucket = aws_s3_bucket.data.id
 
-  block_public_acls       = false # VULN
-  block_public_policy     = false # VULN
-  ignore_public_acls      = false # VULN
-  restrict_public_buckets = false # VULN
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_policy" "data_public_read" {
-  bucket = aws_s3_bucket.data.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "PublicReadGetObject"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:GetObject"
-        Resource  = "${aws_s3_bucket.data.arn}/*"
-      }
-    ]
-  })
-
-  depends_on = [aws_s3_bucket_public_access_block.data]
-}
+# (Removed by the fix: aws_s3_bucket_policy.data_public_read, which granted
+# s3:GetObject to Principal "*". Nothing in this project needs anonymous
+# reads, so the right fix is no public policy at all, not a narrower one.)
 
 # VULN #4 — Unencrypted storage. No server-side encryption configuration is
 # attached to this bucket, so objects land without SSE. Maps to CIS AWS

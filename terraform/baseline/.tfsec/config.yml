@@ -1,0 +1,5 @@
+# Same project-wide accepted controls as .checkov.yaml (see that file and
+# docs/ci-pipeline.md). Everything else is suppressed inline, per resource.
+exclude:
+  - aws-s3-enable-bucket-logging
+  - aws-s3-enable-versioning

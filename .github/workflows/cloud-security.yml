@@ -2,6 +2,9 @@ name: Cloud security pipeline
 
 on:
   push:
+    # Branches only: tags (such as vulnerable-baseline) point at old,
+    # deliberately insecure code that is expected to fail.
+    branches: ["**"]
   pull_request:
 
 permissions:
@@ -42,6 +45,7 @@ jobs:
         with:
           working_directory: terraform/baseline
           version: v1.28.14
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   secret-scan:
     name: "Stage 2: Secret scan (gitleaks)"

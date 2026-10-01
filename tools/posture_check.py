@@ -194,7 +194,8 @@ def main():
     print(table)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
-            f.write("### Posture checks (Moto)\n\n" + table + "\n")
+            # Escape "*" so GitHub's Markdown doesn't read "*:*" as italics.
+            f.write("### Posture checks (Moto)\n\n" + table.replace("*", "\\*") + "\n")
     if unexpected:
         print("\nUnexpected results:\n- " + "\n- ".join(unexpected), file=sys.stderr)
         return 1

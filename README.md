@@ -1,6 +1,6 @@
 # Flagship 2: Cloud Security Pipeline
 
-Status: **in progress — 5 of 6 misconfigurations fixed** (see
+Status: **all 6 seeded misconfigurations fixed** (see
 [docs/vulnerabilities/](docs/vulnerabilities/README.md)). All three CI
 stages run and pass. This README will grow the same way
 Flagship 1's did — methodology and findings sections get added once there's

@@ -1,9 +1,12 @@
-# VULN #6 — CloudTrail not multi-region, no log file validation. A
-# single-region trail misses activity everywhere else the account is
-# touched, and without log file validation there's no cryptographic way to
-# prove the trail wasn't tampered with after the fact. "You can't do
-# detection engineering on a target with no logging" — this is the
-# deliberate bridge to Flagship 3. Maps to CIS AWS Foundations 3.1 / 3.2.
+# VULN #6 — CloudTrail not multi-region, no log file validation. FIXED.
+#
+# As seeded (tag `vulnerable-baseline`), the trail recorded one region only
+# and had log file validation off. A single-region trail misses activity in
+# every other region the account is used in, and without validation there's
+# no cryptographic way to show the log files weren't changed or deleted
+# afterwards. See docs/vulnerabilities/06-cloudtrail-single-region.md.
+# Maps to CIS AWS Foundations v1.4.0 3.1 / 3.2. This trail is also what
+# Flagship 3 (detection engineering) will build on.
 resource "aws_s3_bucket" "cloudtrail" {
   #checkov:skip=CKV_AWS_145:Accepted: SSE-S3 (AWS default, set explicitly below) instead of a customer-managed KMS key
   bucket        = "${var.project_name}-cloudtrail-${random_id.suffix.hex}"
@@ -79,21 +82,17 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
   })
 }
 
-#tfsec:ignore:aws-cloudtrail-enable-all-regions
-#tfsec:ignore:aws-cloudtrail-enable-log-validation
 #tfsec:ignore:aws-cloudtrail-enable-at-rest-encryption
 #tfsec:ignore:aws-cloudtrail-ensure-cloudwatch-integration
 resource "aws_cloudtrail" "main" {
-  #checkov:skip=CKV_AWS_67:VULN #6 seeded (single-region trail), fix pending
-  #checkov:skip=CKV_AWS_36:VULN #6 seeded (no log file validation), fix pending
   #checkov:skip=CKV_AWS_35:Accepted for the lab: no paid KMS key; logs use SSE-S3
   #checkov:skip=CKV_AWS_252:Accepted for now: no SNS delivery notifications
   #checkov:skip=CKV2_AWS_10:Deferred to Flagship 3 (detection engineering), which adds CloudWatch Logs
   name           = "${var.project_name}-trail"
   s3_bucket_name = aws_s3_bucket.cloudtrail.id
 
-  is_multi_region_trail      = false # VULN
-  enable_log_file_validation = false # VULN
+  is_multi_region_trail      = true
+  enable_log_file_validation = true
 
   depends_on = [
     aws_s3_bucket_policy.cloudtrail,

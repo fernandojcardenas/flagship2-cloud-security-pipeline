@@ -24,7 +24,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Seeded misconfigurations not fixed yet. A fix commit removes its number.
-KNOWN_OPEN = {6}
+KNOWN_OPEN = set()
 
 PREFIX = os.environ.get("PROJECT_NAME", "flagship2-baseline")
 ENDPOINT = os.environ.get("MOTO_ENDPOINT", "http://localhost:5000")
@@ -192,7 +192,7 @@ CHECKS = [
     (3, "Security group open to 0.0.0.0/0 on SSH", "5.2", vuln3),
     (4, "S3 bucket accepts requests without TLS", "2.1.2", vuln4),
     (5, "Long-lived IAM user access key, no MFA", "1.10 / 1.14", vuln5),
-    (6, "CloudTrail not multi-region, no log validation", "3.1 / 3.2", vuln6),
+    (6, "CloudTrail not multi-region, no log file validation", "3.1 / 3.2", vuln6),
     (None, "CloudTrail log bucket public access (not seeded)", "2.1.5", cloudtrail_bucket),
 ]
 
@@ -220,7 +220,10 @@ def main():
         print("\nUnexpected results:\n- " + "\n- ".join(unexpected), file=sys.stderr)
         return 1
     n = len(KNOWN_OPEN)
-    print(f"\nAll results as expected ({n} seeded misconfiguration{'' if n == 1 else 's'} still open).")
+    if n == 0:
+        print("\nAll results as expected (all six seeded misconfigurations fixed).")
+    else:
+        print(f"\nAll results as expected ({n} seeded misconfiguration{'' if n == 1 else 's'} still open).")
     return 0
 
 

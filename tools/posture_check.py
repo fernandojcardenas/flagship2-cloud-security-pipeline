@@ -24,7 +24,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Seeded misconfigurations not fixed yet. A fix commit removes its number.
-KNOWN_OPEN = {4, 5, 6}
+KNOWN_OPEN = {5, 6}
 
 PREFIX = os.environ.get("PROJECT_NAME", "flagship2-baseline")
 ENDPOINT = os.environ.get("MOTO_ENDPOINT", "http://localhost:5000")
@@ -127,18 +127,30 @@ def vuln3():
     return not bad, ("open to the internet: " + "; ".join(bad)) if bad else "no inbound rules open to the internet"
 
 
+def denies_insecure_transport(statement):
+    actions = set(as_list(statement.get("Action", [])))
+    principal = statement.get("Principal")
+    value = statement.get("Condition", {}).get("Bool", {}).get("aws:SecureTransport")
+    return (statement.get("Effect") == "Deny"
+            and bool({"s3:*", "*"} & actions)
+            and (principal == "*" or (isinstance(principal, dict) and principal.get("AWS") == "*"))
+            and str(value).lower() == "false")
+
+
 def vuln4():
-    name = bucket("data")
-    try:
-        rules = s3.get_bucket_encryption(Bucket=name)["ServerSideEncryptionConfiguration"]["Rules"]
-        algos = [r["ApplyServerSideEncryptionByDefault"]["SSEAlgorithm"] for r in rules]
-    except ClientError as e:
-        if e.response["Error"]["Code"] != "ServerSideEncryptionConfigurationNotFoundError":
-            raise
-        algos = []
-    ok = "aws:kms" in algos
-    return ok, ("default encryption: " + (", ".join(algos) if algos else "none reported") +
-                ("" if ok else " (control needs SSE-KMS)"))
+    bad = []
+    for kind in ("data", "cloudtrail"):
+        name = bucket(kind)
+        try:
+            policy = json.loads(s3.get_bucket_policy(Bucket=name)["Policy"])
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "NoSuchBucketPolicy":
+                raise
+            bad.append(f"{kind} bucket: no bucket policy")
+            continue
+        if not any(denies_insecure_transport(st) for st in as_list(policy.get("Statement", []))):
+            bad.append(f"{kind} bucket: policy doesn't deny non-TLS requests")
+    return not bad, "; ".join(bad) if bad else "both buckets deny requests without TLS"
 
 
 def vuln5():
@@ -174,7 +186,7 @@ CHECKS = [
     (1, "Public S3 bucket", "2.1.5", vuln1),
     (2, "Overly permissive IAM policy", "1.16", vuln2),
     (3, "Security group open to 0.0.0.0/0 on SSH", "5.2", vuln3),
-    (4, "Unencrypted S3 storage", "2.1.1", vuln4),
+    (4, "S3 bucket accepts requests without TLS", "2.1.2", vuln4),
     (5, "No MFA / no key rotation on IAM user", "1.10 / 1.14", vuln5),
     (6, "CloudTrail not multi-region, no log validation", "3.1 / 3.2", vuln6),
     (None, "CloudTrail log bucket public access (not seeded)", "2.1.5", cloudtrail_bucket),
@@ -193,7 +205,7 @@ def main():
             state = "UNEXPECTED " + state
         rows.append(f"| {num or '—'} | {title} | {cis} | {state} | {detail} |")
 
-    table = "\n".join(["| # | Control | CIS | Result | What the API returned |",
+    table = "\n".join(["| # | Control | CIS v1.4.0 | Result | What the API returned |",
                        "|---|---|---|---|---|", *rows])
     print(table)
     if os.environ.get("GITHUB_STEP_SUMMARY"):

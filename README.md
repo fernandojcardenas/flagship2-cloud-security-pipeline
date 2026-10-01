@@ -1,6 +1,6 @@
 # Flagship 2: Cloud Security Pipeline
 
-Status: **in progress — 3 of 6 misconfigurations fixed** (see
+Status: **in progress — 4 of 6 misconfigurations fixed** (see
 [docs/vulnerabilities/](docs/vulnerabilities/README.md)). All three CI
 stages run and pass. This README will grow the same way
 Flagship 1's did — methodology and findings sections get added once there's
@@ -11,12 +11,13 @@ The original, fully vulnerable baseline is kept at the
 
 A Terraform baseline for a small AWS footprint (S3, IAM, a security group,
 CloudTrail), seeded with six deliberate misconfigurations, each mapped to
-a CIS AWS Foundations Benchmark control:
+a CIS AWS Foundations Benchmark control (numbering from v1.4.0):
 
 1. Public S3 bucket
 2. Overly permissive IAM policy (`Action: "*"`, `Resource: "*"`)
 3. Security group open to `0.0.0.0/0` on SSH
-4. Unencrypted S3 storage
+4. S3 buckets accept requests without TLS (reframed from "unencrypted storage",
+   which AWS made impossible in 2023; see the [writeup](docs/vulnerabilities/04-s3-requests-without-tls.md))
 5. No MFA / no key rotation on an IAM user
 6. CloudTrail not multi-region, no log file validation
 

@@ -7,12 +7,12 @@ static scanners and from deploying to the Moto emulator (Stage 3 of CI).
 The project uses no AWS account; VULN #1's exploit was captured once on
 real AWS before that decision.
 
-| # | Misconfiguration | CIS AWS control | Status |
+| # | Misconfiguration | CIS v1.4.0 | Status |
 |---|---|---|---|
 | 1 | Public S3 bucket | 2.1.5 | Fixed. Exploited on real AWS (Sept 2026); fix confirmed by scanners and the emulator posture check ([writeup](01-public-s3-bucket.md)) |
 | 2 | Overly permissive IAM policy | 1.16 | Fixed (least privilege); scanners, Cloudsplaining and the emulator posture check confirm ([writeup](02-overly-permissive-iam-policy.md)) |
 | 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | Fixed (no inbound access, HTTPS-only egress); scanners and the emulator posture check confirm ([writeup](03-ssh-open-to-internet.md)) |
-| 4 | Unencrypted S3 storage | 2.1.1 | Not started |
+| 4 | S3 buckets accept requests without TLS (reframed from "unencrypted storage") | 2.1.2 | Fixed (TLS-only bucket policies); custom Checkov policies and the emulator posture check confirm ([writeup](04-s3-requests-without-tls.md)) |
 | 5 | No MFA / no key rotation on IAM user | 1.10 / 1.12 / 1.14 | Not started |
 | 6 | CloudTrail not multi-region, no log file validation | 3.1 / 3.2 | Not started |
 

@@ -4,10 +4,8 @@
 # prove the trail wasn't tampered with after the fact. "You can't do
 # detection engineering on a target with no logging" — this is the
 # deliberate bridge to Flagship 3. Maps to CIS AWS Foundations 3.1 / 3.2.
-#tfsec:ignore:aws-s3-enable-bucket-encryption
-#tfsec:ignore:aws-s3-encryption-customer-key
 resource "aws_s3_bucket" "cloudtrail" {
-  #checkov:skip=CKV_AWS_145:Accepted for the lab: SSE-S3 (AWS default) instead of a paid customer-managed KMS key
+  #checkov:skip=CKV_AWS_145:Accepted: SSE-S3 (AWS default, set explicitly below) instead of a customer-managed KMS key
   bucket        = "${var.project_name}-cloudtrail-${random_id.suffix.hex}"
   force_destroy = true
 }
@@ -26,6 +24,19 @@ resource "aws_s3_bucket_public_access_block" "cloudtrail" {
 }
 
 data "aws_caller_identity" "current" {}
+
+# SSE-S3 rather than a customer-managed KMS key; see the CKV_AWS_145 note
+# on the bucket.
+#tfsec:ignore:aws-s3-encryption-customer-key
+resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
+  bucket = aws_s3_bucket.cloudtrail.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
 
 resource "aws_s3_bucket_policy" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
@@ -48,6 +59,20 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
         Resource  = "${aws_s3_bucket.cloudtrail.arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
         Condition = {
           StringEquals = { "s3:x-amz-acl" = "bucket-owner-full-control" }
+        }
+      },
+      {
+        # VULN #4 fix, applied to the log bucket too (see s3.tf).
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.cloudtrail.arn,
+          "${aws_s3_bucket.cloudtrail.arn}/*",
+        ]
+        Condition = {
+          Bool = { "aws:SecureTransport" = "false" }
         }
       }
     ]

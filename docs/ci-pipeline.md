@@ -11,11 +11,16 @@ local AWS emulator inside the runner:
 Scans `terraform/baseline/*.tf` for known-bad patterns without applying
 anything: the public S3 bucket policy, the public-access-block settings,
 the `Action: "*"` IAM policy, the `0.0.0.0/0` security group rule, and the
-missing encryption/log-file-validation settings are all things a static
-scanner can see directly in the HCL. Checkov is primary (large default
-policy library, plus custom policies in Python/YAML if needed — the same
-role custom Semgrep rules played in Flagship 1); tfsec runs second for
+missing log-file-validation settings are all things a static scanner can
+see directly in the HCL. Checkov is primary; tfsec runs second for
 cross-validation.
+
+Checkov also loads this project's own rules from `checkov-policies/`, the
+same role custom Semgrep rules played in Flagship 1. They exist because
+neither scanner checks for TLS-only bucket policies on this project's
+resources (VULN #4): `CKV2_F2_1` requires every bucket to have a policy,
+and `CKV_F2_2` requires that policy to deny requests without TLS.
+`CKV_F2_2` fails closed: a policy it can't parse counts as a failure.
 
 Before the scanners, the same job runs `terraform fmt -check` and
 `terraform validate`, so a scan never runs on code that wouldn't apply.
@@ -68,8 +73,8 @@ no SNS topic for the trail, no instance attached to the security group,
 and CloudWatch Logs for the trail, deferred to Flagship 3 (detection
 engineering), where it's needed.
 
-Current state: Checkov 37 passed, 0 failed, 9 skipped; tfsec 15 passed,
-23 ignored, 0 problems.
+Current state: Checkov 44 passed, 0 failed, 9 skipped (including the two
+custom policies); tfsec 17 passed, 21 ignored, 0 problems.
 
 One limit worth knowing: when a policy refers to another resource (for
 example `aws_s3_bucket.data.arn`), Checkov can't resolve the value before
@@ -93,7 +98,8 @@ than being folded into Stage 1.
 runs `tools/posture_check.py`. The checker reads each seeded control back
 through the AWS API, the way a posture scanner like Prowler would against
 a real account: the bucket's public access block and policy, every
-customer-managed IAM policy, security group rules (any inbound rule open to the internet), bucket encryption, IAM
+customer-managed IAM policy, security group rules (any inbound rule open to the internet), each bucket's
+policy (TLS-only), IAM
 users' access keys and MFA devices, and the trail's settings.
 
 This stage catches what Stage 1 can't see in the source: the IAM user with
@@ -109,18 +115,18 @@ run's summary):
 
 ```
 $ tools/local_check.sh
-Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
-| # | Control | CIS | Result | What the API returned |
+Apply complete! Resources: 16 added, 0 changed, 0 destroyed.
+| # | Control | CIS v1.4.0 | Result | What the API returned |
 |---|---|---|---|---|
 | 1 | Public S3 bucket | 2.1.5 | pass | all four settings on; no public bucket policy |
 | 2 | Overly permissive IAM policy | 1.16 | pass | no "*:*" policies |
 | 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | pass | no inbound rules open to the internet |
-| 4 | Unencrypted S3 storage | 2.1.1 | open (seeded) | default encryption: none reported (control needs SSE-KMS) |
+| 4 | S3 bucket accepts requests without TLS | 2.1.2 | pass | both buckets deny requests without TLS |
 | 5 | No MFA / no key rotation on IAM user | 1.10 / 1.14 | open (seeded) | active access key, no MFA: flagship2-baseline-svc-user |
 | 6 | CloudTrail not multi-region, no log validation | 3.1 / 3.2 | open (seeded) | missing: multi-region, log file validation |
 | — | CloudTrail log bucket public access (not seeded) | 2.1.5 | pass | all four settings on |
 
-All results as expected (3 seeded misconfigurations still open).
+All results as expected (2 seeded misconfigurations still open).
 ```
 
 ### What an emulator can and can't prove

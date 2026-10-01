@@ -3,6 +3,10 @@ directory:
 framework:
   - terraform
 compact: true
+# Project-specific checks (VULN #4: S3 requests must use TLS). Checkov's own
+# TLS check, CKV_AWS_379, only looks at aws_s3_bucket_acl resources.
+external-checks-dir:
+  - checkov-policies
 download-external-modules: false
 
 # Controls accepted for this project as a whole, not tied to one of the six

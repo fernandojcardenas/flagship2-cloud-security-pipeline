@@ -1,5 +1,5 @@
 output "data_bucket_name" {
-  description = "Name of the data bucket (VULN #1, fixed; VULN #4)."
+  description = "Name of the data bucket (VULN #1 and #4, fixed)."
   value       = aws_s3_bucket.data.bucket
 }
 

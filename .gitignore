@@ -14,3 +14,6 @@ test-public-file.txt
 # Emulator provider override: only ever copied into a scratch directory by
 # tools/local_check.sh, never into the real baseline.
 terraform/baseline/*_override.tf
+
+# Python bytecode (Checkov loads checkov-policies/*.py)
+__pycache__/

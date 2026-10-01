@@ -24,7 +24,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Seeded misconfigurations not fixed yet. A fix commit removes its number.
-KNOWN_OPEN = {5, 6}
+KNOWN_OPEN = {6}
 
 PREFIX = os.environ.get("PROJECT_NAME", "flagship2-baseline")
 ENDPOINT = os.environ.get("MOTO_ENDPOINT", "http://localhost:5000")
@@ -154,6 +154,9 @@ def vuln4():
 
 
 def vuln5():
+    # Any active access key on a project IAM user fails: a stored key is the
+    # long-lived credential this control is about, with or without MFA (MFA
+    # doesn't protect API calls made with the key). MFA status is reported.
     bad = []
     for page in iam.get_paginator("list_users").paginate():
         for u in page["Users"]:
@@ -161,10 +164,11 @@ def vuln5():
                 continue
             keys = [k for k in iam.list_access_keys(UserName=u["UserName"])["AccessKeyMetadata"]
                     if k["Status"] == "Active"]
-            mfa = iam.list_mfa_devices(UserName=u["UserName"])["MFADevices"]
-            if keys and not mfa:
-                bad.append(u["UserName"])
-    return not bad, ("active access key, no MFA: " + ", ".join(bad)) if bad else "no keyed users without MFA"
+            if keys:
+                mfa = iam.list_mfa_devices(UserName=u["UserName"])["MFADevices"]
+                bad.append(f"{u['UserName']} ({len(keys)} active key{'s' if len(keys) > 1 else ''}, "
+                           f"{'MFA on' if mfa else 'no MFA'})")
+    return not bad, ("long-lived access key: " + ", ".join(bad)) if bad else "no IAM users with access keys"
 
 
 def vuln6():
@@ -187,7 +191,7 @@ CHECKS = [
     (2, "Overly permissive IAM policy", "1.16", vuln2),
     (3, "Security group open to 0.0.0.0/0 on SSH", "5.2", vuln3),
     (4, "S3 bucket accepts requests without TLS", "2.1.2", vuln4),
-    (5, "No MFA / no key rotation on IAM user", "1.10 / 1.14", vuln5),
+    (5, "Long-lived IAM user access key, no MFA", "1.10 / 1.14", vuln5),
     (6, "CloudTrail not multi-region, no log validation", "3.1 / 3.2", vuln6),
     (None, "CloudTrail log bucket public access (not seeded)", "2.1.5", cloudtrail_bucket),
 ]
@@ -215,7 +219,8 @@ def main():
     if unexpected:
         print("\nUnexpected results:\n- " + "\n- ".join(unexpected), file=sys.stderr)
         return 1
-    print(f"\nAll results as expected ({len(KNOWN_OPEN)} seeded misconfigurations still open).")
+    n = len(KNOWN_OPEN)
+    print(f"\nAll results as expected ({n} seeded misconfiguration{'' if n == 1 else 's'} still open).")
     return 0
 
 

@@ -73,8 +73,8 @@ no SNS topic for the trail, no instance attached to the security group,
 and CloudWatch Logs for the trail, deferred to Flagship 3 (detection
 engineering), where it's needed.
 
-Current state: Checkov 44 passed, 0 failed, 9 skipped (including the two
-custom policies); tfsec 17 passed, 21 ignored, 0 problems.
+Current state: Checkov 42 passed, 0 failed, 8 skipped (including the two
+custom policies); tfsec 16 passed, 21 ignored, 0 problems.
 
 One limit worth knowing: when a policy refers to another resource (for
 example `aws_s3_bucket.data.arn`), Checkov can't resolve the value before
@@ -102,9 +102,9 @@ customer-managed IAM policy, security group rules (any inbound rule open to the 
 policy (TLS-only), IAM
 users' access keys and MFA devices, and the trail's settings.
 
-This stage catches what Stage 1 can't see in the source: the IAM user with
-an active key and no MFA (VULN #5) is only visible once the user and key
-exist. It also confirms the Terraform really applies.
+This stage catches what Stage 1 can't see in the source: an IAM user's
+active access keys and MFA devices (VULN #5) only exist once the user and
+key are deployed. It also confirms the Terraform really applies.
 
 The checker fails the build if anything differs from what's expected: a
 fixed VULN that fails again, or a VULN still listed as open in
@@ -115,18 +115,18 @@ run's summary):
 
 ```
 $ tools/local_check.sh
-Apply complete! Resources: 16 added, 0 changed, 0 destroyed.
+Apply complete! Resources: 14 added, 0 changed, 0 destroyed.
 | # | Control | CIS v1.4.0 | Result | What the API returned |
 |---|---|---|---|---|
 | 1 | Public S3 bucket | 2.1.5 | pass | all four settings on; no public bucket policy |
 | 2 | Overly permissive IAM policy | 1.16 | pass | no "*:*" policies |
 | 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | pass | no inbound rules open to the internet |
 | 4 | S3 bucket accepts requests without TLS | 2.1.2 | pass | both buckets deny requests without TLS |
-| 5 | No MFA / no key rotation on IAM user | 1.10 / 1.14 | open (seeded) | active access key, no MFA: flagship2-baseline-svc-user |
+| 5 | Long-lived IAM user access key, no MFA | 1.10 / 1.14 | pass | no IAM users with access keys |
 | 6 | CloudTrail not multi-region, no log validation | 3.1 / 3.2 | open (seeded) | missing: multi-region, log file validation |
 | — | CloudTrail log bucket public access (not seeded) | 2.1.5 | pass | all four settings on |
 
-All results as expected (2 seeded misconfigurations still open).
+All results as expected (1 seeded misconfiguration still open).
 ```
 
 ### What an emulator can and can't prove

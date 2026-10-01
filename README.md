@@ -1,6 +1,6 @@
 # Flagship 2: Cloud Security Pipeline
 
-Status: **in progress — 4 of 6 misconfigurations fixed** (see
+Status: **in progress — 5 of 6 misconfigurations fixed** (see
 [docs/vulnerabilities/](docs/vulnerabilities/README.md)). All three CI
 stages run and pass. This README will grow the same way
 Flagship 1's did — methodology and findings sections get added once there's
@@ -18,7 +18,7 @@ a CIS AWS Foundations Benchmark control (numbering from v1.4.0):
 3. Security group open to `0.0.0.0/0` on SSH
 4. S3 buckets accept requests without TLS (reframed from "unencrypted storage",
    which AWS made impossible in 2023; see the [writeup](docs/vulnerabilities/04-s3-requests-without-tls.md))
-5. No MFA / no key rotation on an IAM user
+5. Long-lived IAM user access key, no MFA
 6. CloudTrail not multi-region, no log file validation
 
 **No AWS account needed.** Everything runs on your machine or in the CI

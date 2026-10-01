@@ -58,20 +58,18 @@ resource "aws_iam_role_policy_attachment" "app_data_access" {
   policy_arn = aws_iam_policy.app_data_access.arn
 }
 
-# VULN #5 — No MFA / no key rotation. This service user gets a long-lived
-# access key with no rotation policy and no MFA requirement enforced.
-# Terraform can't "seed" the absence of MFA directly — that's account/user
-# state, not a declarable resource — so static IaC scanning can only flag
-# that an IAM user exists at all (Checkov CKV_AWS_273). Stage 3's posture
-# check catches the real problem by reading the deployed user's access keys
-# and MFA devices back from the API. Key *age* can't be shown on a fresh
-# deploy; that part stays a documented limitation. Maps to CIS AWS
-# Foundations 1.10 / 1.12 / 1.14.
-resource "aws_iam_user" "svc" {
-  #checkov:skip=CKV_AWS_273:VULN #5 seeded (long-lived IAM user instead of SSO), fix pending
-  name = "${var.project_name}-svc-user"
-}
-
-resource "aws_iam_access_key" "svc" {
-  user = aws_iam_user.svc.name
-}
+# VULN #5 — Long-lived IAM user access key, no MFA. FIXED.
+#
+# As seeded (tag `vulnerable-baseline`), a service user
+# (`flagship2-baseline-svc-user`) had a long-lived access key, with no MFA
+# and nothing forcing rotation. A stored key like that works from anywhere
+# until someone notices it leaked. See
+# docs/vulnerabilities/05-long-lived-access-key.md. Maps to CIS AWS
+# Foundations v1.4.0 1.10 / 1.12 / 1.14.
+#
+# The fix removes the user and its key rather than adding MFA or a rotation
+# schedule: nothing in this project needs a long-lived credential. Workloads
+# on AWS use IAM roles (like aws_iam_role.app above), which hand out
+# temporary credentials automatically. A workload outside AWS would use
+# short-lived credentials too (OIDC federation or IAM Roles Anywhere),
+# never a stored key.

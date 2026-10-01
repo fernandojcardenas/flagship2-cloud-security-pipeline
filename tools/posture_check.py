@@ -24,7 +24,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # Seeded misconfigurations not fixed yet. A fix commit removes its number.
-KNOWN_OPEN = {2, 3, 4, 5, 6}
+KNOWN_OPEN = {3, 4, 5, 6}
 
 PREFIX = os.environ.get("PROJECT_NAME", "flagship2-baseline")
 ENDPOINT = os.environ.get("MOTO_ENDPOINT", "http://localhost:5000")

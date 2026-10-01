@@ -1,8 +1,14 @@
-# VULN #2 — Overly permissive IAM policy. Action "*" / Resource "*" grants
-# full administrative access to anything that assumes this role: one
-# compromised credential using this role is a fully compromised account.
-# Maps to CIS AWS Foundations 1.16 (no policies with full "*:*"
-# administrative privileges).
+# VULN #2 — Overly permissive IAM policy. FIXED.
+#
+# As seeded (tag `vulnerable-baseline`), the app role had a policy with
+# Action "*" / Resource "*": full administrative access, so one stolen
+# credential for this role meant a fully compromised account (see
+# docs/vulnerabilities/02-overly-permissive-iam-policy.md). Maps to CIS AWS
+# Foundations 1.16 (no policies with full "*:*" administrative privileges).
+#
+# The fix gives the role only what the app does: list, read and write
+# objects in the data bucket. No IAM actions, no other services, no other
+# buckets.
 resource "aws_iam_role" "app" {
   name = "${var.project_name}-app-role"
 
@@ -20,35 +26,36 @@ resource "aws_iam_role" "app" {
   })
 }
 
+# tfsec flags the "/*" in the object ARN below as a wildcard. Object-level S3
+# permissions can only be granted that way (keys aren't known in advance),
+# and the wildcard stays inside this one bucket. Checkov passes it.
 #tfsec:ignore:aws-iam-no-policy-wildcards
-resource "aws_iam_policy" "app_admin" {
-  #checkov:skip=CKV_AWS_62:VULN #2 seeded (full "*:*" admin), fix pending
-  #checkov:skip=CKV_AWS_63:VULN #2 seeded ("*" action), fix pending
-  #checkov:skip=CKV_AWS_355:VULN #2 seeded ("*" resource), fix pending
-  #checkov:skip=CKV_AWS_286:VULN #2 seeded (privilege escalation), fix pending
-  #checkov:skip=CKV_AWS_287:VULN #2 seeded (credentials exposure), fix pending
-  #checkov:skip=CKV_AWS_288:VULN #2 seeded (data exfiltration), fix pending
-  #checkov:skip=CKV_AWS_289:VULN #2 seeded (permissions management), fix pending
-  #checkov:skip=CKV_AWS_290:VULN #2 seeded (unconstrained write), fix pending
-  #checkov:skip=CKV2_AWS_40:VULN #2 seeded (full IAM privileges), fix pending
-  name        = "${var.project_name}-overpermissive-policy"
-  description = "VULN: grants unrestricted access to every action on every resource."
+resource "aws_iam_policy" "app_data_access" {
+  name        = "${var.project_name}-app-data-access"
+  description = "Least privilege for the app: objects in the data bucket only."
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
+        Sid      = "ListDataBucket"
         Effect   = "Allow"
-        Action   = "*"
-        Resource = "*"
+        Action   = "s3:ListBucket"
+        Resource = aws_s3_bucket.data.arn
+      },
+      {
+        Sid      = "ReadWriteDataObjects"
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject"]
+        Resource = "${aws_s3_bucket.data.arn}/*"
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "app_admin" {
+resource "aws_iam_role_policy_attachment" "app_data_access" {
   role       = aws_iam_role.app.name
-  policy_arn = aws_iam_policy.app_admin.arn
+  policy_arn = aws_iam_policy.app_data_access.arn
 }
 
 # VULN #5 — No MFA / no key rotation. This service user gets a long-lived

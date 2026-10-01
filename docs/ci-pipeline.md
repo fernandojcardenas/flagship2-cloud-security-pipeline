@@ -68,7 +68,15 @@ no SNS topic for the trail, no instance attached to the security group,
 and CloudWatch Logs for the trail, deferred to Flagship 3 (detection
 engineering), where it's needed.
 
-Current state: Checkov 33 passed, 0 failed; tfsec 16 passed, 0 problems.
+Current state: Checkov 35 passed, 0 failed, 11 skipped; tfsec 16 passed,
+24 ignored, 0 problems.
+
+One limit worth knowing: when a policy refers to another resource (for
+example `aws_s3_bucket.data.arn`), Checkov can't resolve the value before
+deploy, and several IAM checks then produce no result at all rather than a
+pass. VULN #2's writeup shows this (2 of 9 checks report on the fixed
+policy; all 9 pass once the real ARN is filled in). Stage 3 covers it by
+reading the deployed policies.
 
 ## Stage 2: Secret scan — gitleaks
 
@@ -105,14 +113,14 @@ Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
 | # | Control | CIS | Result | What the API returned |
 |---|---|---|---|---|
 | 1 | Public S3 bucket | 2.1.5 | pass | all four settings on; no public bucket policy |
-| 2 | Overly permissive IAM policy | 1.16 | open (seeded) | Action "*" on Resource "*": flagship2-baseline-overpermissive-policy |
+| 2 | Overly permissive IAM policy | 1.16 | pass | no "*:*" policies |
 | 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | open (seeded) | port 22 open to the internet: flagship2-baseline-wide-open-ssh |
 | 4 | Unencrypted S3 storage | 2.1.1 | open (seeded) | default encryption: none reported (control needs SSE-KMS) |
 | 5 | No MFA / no key rotation on IAM user | 1.10 / 1.14 | open (seeded) | active access key, no MFA: flagship2-baseline-svc-user |
 | 6 | CloudTrail not multi-region, no log validation | 3.1 / 3.2 | open (seeded) | missing: multi-region, log file validation |
 | — | CloudTrail log bucket public access (not seeded) | 2.1.5 | pass | all four settings on |
 
-All results as expected (5 seeded misconfigurations still open).
+All results as expected (4 seeded misconfigurations still open).
 ```
 
 ### What an emulator can and can't prove

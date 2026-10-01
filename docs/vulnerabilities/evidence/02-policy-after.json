@@ -1,0 +1,20 @@
+{
+  "Statement": [
+    {
+      "Action": "s3:ListBucket",
+      "Effect": "Allow",
+      "Resource": "arn:aws:s3:::flagship2-baseline-data-e1b6139b",
+      "Sid": "ListDataBucket"
+    },
+    {
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:s3:::flagship2-baseline-data-e1b6139b/*",
+      "Sid": "ReadWriteDataObjects"
+    }
+  ],
+  "Version": "2012-10-17"
+}

@@ -2,9 +2,10 @@
 
 **CIS AWS Foundations Benchmark control:** 2.1.5
 
-**Status:** Exploited against real AWS (2026-09-15). Fixed in code and
-confirmed by both static scanners (2026-10-01). Live re-check against AWS
-still pending — see "Live re-verification" below.
+**Status:** Fixed (2026-10-01). Exploited against real AWS (2026-09-15);
+fix confirmed by both static scanners and by the emulator posture check.
+This project has since gone local-only (no AWS account), so the fix was not
+re-tested on real AWS; see "Emulator check" below for what that means.
 
 ## Where it's seeded
 
@@ -190,12 +191,38 @@ is weakened again. To confirm, the old `s3.tf` was put back temporarily and
 both scanners failed (Checkov exit 1 with 6 findings, tfsec exit 1 with 4
 HIGH).
 
-## Live re-verification (pending)
+## Emulator check
 
-Static scans prove what the Terraform says, not what AWS does. Still to do,
-in a short-lived apply:
+Stage 3 of CI deploys the baseline to Moto, a local AWS emulator, and reads
+the bucket's settings back through the AWS API (`tools/local_check.sh`).
+Rows for the other, still-open VULNs are trimmed below.
 
-- Apply the fixed baseline, upload a test object as the bucket owner.
-- Re-run the same unauthenticated `curl`; expected: `AccessDenied` instead
-  of the object body.
-- Capture that output here as the after-state, then `terraform destroy`.
+Before (the `vulnerable-baseline` Terraform; the checker exits 1):
+
+```
+Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
+| # | Control | CIS | Result | What the API returned |
+|---|---|---|---|---|
+| 1 | Public S3 bucket | 2.1.5 | UNEXPECTED FAIL | off: BlockPublicAcls, BlockPublicPolicy, IgnorePublicAcls, RestrictPublicBuckets; bucket policy allows s3:GetObject to everyone |
+| — | CloudTrail log bucket public access (not seeded) | 2.1.5 | UNEXPECTED FAIL | no public access block |
+Unexpected results:
+- #1 Public S3 bucket: fails
+- #- CloudTrail log bucket public access (not seeded): fails
+```
+
+After (the fix):
+
+```
+Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
+| # | Control | CIS | Result | What the API returned |
+|---|---|---|---|---|
+| 1 | Public S3 bucket | 2.1.5 | pass | all four settings on; no public bucket policy |
+| — | CloudTrail log bucket public access (not seeded) | 2.1.5 | pass | all four settings on |
+All results as expected (5 seeded misconfigurations still open).
+```
+
+This confirms what got *configured*, not what AWS *enforces*. An anonymous
+`curl` against the emulator wasn't used as fix evidence: Moto ignores
+Block Public Access when deciding whether an anonymous request succeeds
+and lets anyone list a bucket, which real AWS denied above. Details and the
+comparison are in [`docs/ci-pipeline.md`](../ci-pipeline.md#what-an-emulator-can-and-cant-prove).

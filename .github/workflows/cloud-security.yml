@@ -56,27 +56,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Stage 3: Live cloud posture scan (Prowler), checking the actually
-  # provisioned AWS account against the CIS AWS Foundations Benchmark.
-  # Disabled (if: false) until AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
-  # are added as repo secrets for a dedicated, tightly scoped read-only
-  # scanning user — see docs/ci-pipeline.md for why this stage is gated
-  # separately from the other two, which need no live account at all.
-  cloud-posture-scan:
-    name: "Stage 3: Live cloud posture scan (Prowler)"
+  # Stage 3: deploy the baseline to a local AWS emulator (Moto) inside the
+  # runner and read every seeded control back through the AWS API. No AWS
+  # account or credentials are involved anywhere in this project. See
+  # docs/ci-pipeline.md for what this does and doesn't prove.
+  emulator-posture-check:
+    name: "Stage 3: Deploy to emulator + posture checks (Moto)"
     runs-on: ubuntu-latest
-    if: false
     steps:
       - uses: actions/checkout@v7
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: hashicorp/setup-terraform@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          terraform_version: 1.9.8
+          terraform_wrapper: false
 
-      - name: Run Prowler
-        run: |
-          pip install prowler
-          prowler aws --compliance cis_2.0_aws
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Moto
+        run: pip install -r tools/requirements.txt
+
+      - name: Apply to Moto and check posture
+        run: tools/local_check.sh

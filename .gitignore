@@ -10,3 +10,7 @@ crash.*.log
 # Local scratch files created while capturing exploit evidence — never
 # meant to be committed, just proof left on disk during a live run.
 test-public-file.txt
+
+# Emulator provider override: only ever copied into a scratch directory by
+# tools/local_check.sh, never into the real baseline.
+terraform/baseline/*_override.tf

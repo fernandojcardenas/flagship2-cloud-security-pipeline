@@ -1,8 +1,8 @@
 # Flagship 2: Cloud Security Pipeline
 
 Status: **in progress — 1 of 6 misconfigurations fixed** (see
-[docs/vulnerabilities/](docs/vulnerabilities/README.md)). The static scans
-and the secret scan run in CI and pass. This README will grow the same way
+[docs/vulnerabilities/](docs/vulnerabilities/README.md)). All three CI
+stages run and pass. This README will grow the same way
 Flagship 1's did — methodology and findings sections get added once there's
 something real to report, not written in advance of it.
 
@@ -20,16 +20,24 @@ a CIS AWS Foundations Benchmark control:
 5. No MFA / no key rotation on an IAM user
 6. CloudTrail not multi-region, no log file validation
 
-A CI pipeline (`.github/workflows/cloud-security.yml`) runs a static IaC
-scan (Checkov + tfsec), a secret scan (gitleaks), and — once a scoped AWS
-account is wired up — a live cloud posture scan (Prowler) against the CIS
-AWS Foundations Benchmark, on every push and pull request. See
-`docs/ci-pipeline.md` for what each stage catches and why.
+**No AWS account needed.** Everything runs on your machine or in the CI
+runner. A CI pipeline (`.github/workflows/cloud-security.yml`) runs on
+every push and pull request:
 
-Each misconfiguration gets exploited for real against a short-lived,
-narrowly-scoped AWS environment, fixed, and re-verified, with real
-before/after evidence in `docs/vulnerabilities/` — see that folder's
-`README.md` for current status.
+1. a static IaC scan (Checkov + tfsec) of the Terraform source;
+2. a secret scan (gitleaks) of the full history;
+3. a deploy of the baseline to [Moto](https://github.com/getmoto/moto), a
+   local AWS emulator, then a posture check that reads every seeded control
+   back through the AWS API.
+
+See `docs/ci-pipeline.md` for what each stage catches, and what an emulator
+can and can't prove.
+
+Each misconfiguration gets fixed and re-verified with real before/after
+output in `docs/vulnerabilities/` (see that folder's `README.md` for
+status). VULN #1 was also exploited once against a real, short-lived AWS
+account (September 2026), before the project went local-only; that
+evidence is kept in its writeup.
 
 ## Running the checks locally
 
@@ -42,8 +50,13 @@ tfsec terraform/baseline
 
 # gitleaks: see https://github.com/gitleaks/gitleaks for install options
 gitleaks detect --config .gitleaks.toml
+
+# Deploy to a local Moto server and run the posture checks
+# (needs Terraform >= 1.7 and Python 3)
+pip install -r tools/requirements.txt
+tools/local_check.sh
 ```
 
-`terraform/baseline` is not applied by default — provisioning against real
-AWS is a deliberate, manual step (see `docs/ci-pipeline.md`), not something
-that happens automatically from a scaffold.
+`tools/local_check.sh` applies a scratch copy of `terraform/baseline` with
+`emulator/provider_override.tf` added, so it only ever talks to
+`localhost:5000`.

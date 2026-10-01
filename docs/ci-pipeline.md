@@ -1,10 +1,10 @@
 # Cloud security pipeline
 
-Status: **Stages 1–2 live; Stage 3 waiting for a scoped AWS account.**
+Status: **all three stages live. No AWS account is used anywhere.**
 
 `.github/workflows/cloud-security.yml` runs three stages on every push and
-pull request. The first two need no live AWS account at all — they scan
-the Terraform source directly:
+pull request. The first two scan the source; the third deploys it to a
+local AWS emulator inside the runner:
 
 ## Stage 1: Static IaC scan — Checkov + tfsec
 
@@ -77,18 +77,62 @@ Leaked AWS access keys committed to a public repo are one of the most
 common real-world cloud breach vectors, so this gets its own stage rather
 than being folded into Stage 1.
 
-## Stage 3: Live cloud posture scan — Prowler
+## Stage 3: Deploy to an emulator and check posture — Moto
 
-**Currently disabled (`if: false`)** until `AWS_ACCESS_KEY_ID` /
-`AWS_SECRET_ACCESS_KEY` repo secrets exist for a dedicated, narrowly-scoped
-read-only scanning IAM user. Once enabled, this runs Prowler against the
-actually-provisioned AWS account and checks live resource state against
-the CIS AWS Foundations Benchmark — this is the stage that catches things
-Stage 1 structurally can't, because they depend on live account state
-rather than the Terraform source: the IAM user's key age and MFA status
-(VULN #5), and anything that drifted from what the code says (manual
-console changes, provider defaults that changed between applies).
+`tools/local_check.sh` starts [Moto](https://github.com/getmoto/moto)
+(5.2.3, pinned in `tools/requirements.txt`), applies a scratch copy of
+`terraform/baseline` to it with `emulator/provider_override.tf` added, then
+runs `tools/posture_check.py`. The checker reads each seeded control back
+through the AWS API, the way a posture scanner like Prowler would against
+a real account: the bucket's public access block and policy, every
+customer-managed IAM policy, security group rules, bucket encryption, IAM
+users' access keys and MFA devices, and the trail's settings.
 
-This mirrors the role real ZAP scans played in Flagship 1: SAST caught
-what it could see in source, DAST caught what only showed up once the app
-was actually running.
+This stage catches what Stage 1 can't see in the source: the IAM user with
+an active key and no MFA (VULN #5) is only visible once the user and key
+exist. It also confirms the Terraform really applies.
+
+The checker fails the build if anything differs from what's expected: a
+fixed VULN that fails again, or a VULN still listed as open in
+`KNOWN_OPEN` that now passes. That keeps the list and the writeups in step.
+
+Current output (local run, 2026-10-01; the same table goes into each CI
+run's summary):
+
+```
+$ tools/local_check.sh
+Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
+| # | Control | CIS | Result | What the API returned |
+|---|---|---|---|---|
+| 1 | Public S3 bucket | 2.1.5 | pass | all four settings on; no public bucket policy |
+| 2 | Overly permissive IAM policy | 1.16 | open (seeded) | Action "*" on Resource "*": flagship2-baseline-overpermissive-policy |
+| 3 | Security group open to 0.0.0.0/0 on SSH | 5.2 | open (seeded) | port 22 open to the internet: flagship2-baseline-wide-open-ssh |
+| 4 | Unencrypted S3 storage | 2.1.1 | open (seeded) | default encryption: none reported (control needs SSE-KMS) |
+| 5 | No MFA / no key rotation on IAM user | 1.10 / 1.14 | open (seeded) | active access key, no MFA: flagship2-baseline-svc-user |
+| 6 | CloudTrail not multi-region, no log validation | 3.1 / 3.2 | open (seeded) | missing: multi-region, log file validation |
+| — | CloudTrail log bucket public access (not seeded) | 2.1.5 | pass | all four settings on |
+
+All results as expected (5 seeded misconfigurations still open).
+```
+
+### What an emulator can and can't prove
+
+This stage shows what the Terraform *configured*, read back from an API. It
+does not show what AWS *enforces*. Before choosing this design, the same
+Terraform was applied to two free emulators and the data bucket was read
+with an anonymous `curl` (2026-10-01). "Control" means all four Block
+Public Access settings on but the public bucket policy kept, a combination
+AWS documents it refuses to apply.
+
+| Anonymous request | Real AWS (VULN #1 writeup, Sept 2026) | Moto 5.2.3 | MiniStack 1.5.19 |
+|---|---|---|---|
+| Read object, vulnerable baseline | 200, object returned | 200 | 200 |
+| Read object, fixed | not tested | 403 | 200 |
+| Read object, control | not tested (AWS documents that it refuses the public policy) | 200 | 200 |
+| List bucket, vulnerable baseline | AccessDenied | 200 | 200 |
+
+Moto applies bucket policies to anonymous reads but ignores Block Public
+Access and allows anonymous listing; MiniStack applies no access control.
+So an "exploit" run against either would prove little, and the writeups
+don't use one. LocalStack's policy enforcement is a paid feature, so it
+wasn't tested.

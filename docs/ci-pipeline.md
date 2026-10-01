@@ -56,14 +56,14 @@ Suppressions come in two kinds:
   same mistake still fails. This was tested: adding a second security group
   open to `0.0.0.0/0` on SSH failed both scanners.
 - **Project-wide, in `.checkov.yaml` and `terraform/baseline/.tfsec/config.yml`.**
-  Kept to controls that add cost or moving parts to buckets that only exist
-  for minutes:
+  Kept to controls that add moving parts without changing what the project
+  demonstrates (the baseline is only ever deployed to an emulator):
 
 | Control | Checkov | tfsec | Why it's accepted here | In production |
 |---|---|---|---|---|
 | S3 server access logging | CKV_AWS_18 | aws-s3-enable-bucket-logging | Needs a third bucket; CloudTrail already records API calls | Required |
-| S3 versioning | CKV_AWS_21 | aws-s3-enable-versioning | Buckets are destroyed after each run | Required for data and log buckets |
-| Cross-region replication | CKV_AWS_144 | — | Doubles storage for throwaway buckets | Depends on recovery needs |
+| S3 versioning | CKV_AWS_21 | aws-s3-enable-versioning | Buckets only exist for one emulator run | Required for data and log buckets |
+| Cross-region replication | CKV_AWS_144 | — | Needs a second bucket in another region for nothing to recover | Depends on recovery needs |
 | Lifecycle configuration | CKV2_AWS_61 | — | Nothing lives long enough to expire | Recommended |
 | Event notifications | CKV2_AWS_62 | — | No consumer for the events | Depends on the workload |
 

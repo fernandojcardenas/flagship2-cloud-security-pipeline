@@ -10,10 +10,11 @@ external-checks-dir:
 download-external-modules: false
 
 # Controls accepted for this project as a whole, not tied to one of the six
-# seeded misconfigurations. The lab's buckets are short-lived (applied only
-# to capture evidence, then destroyed), so these add cost or moving parts
-# without changing what the project demonstrates. A production account
-# would need them. Rationale per control: docs/ci-pipeline.md.
+# seeded misconfigurations. The baseline is only ever deployed to a local
+# emulator, and these add moving parts (an extra log bucket, replication
+# targets, event consumers) without changing what the project demonstrates.
+# A production account would need them. Rationale per control:
+# docs/ci-pipeline.md.
 #
 # Everything else is suppressed inline, on the one resource it applies to,
 # with a reason. Seeded misconfigurations carry "VULN #n seeded ... fix
